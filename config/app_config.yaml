@@ -1,0 +1,5 @@
+host: "0.0.0.0"
+port: 8000
+debug: false
+default_top_k: 10
+default_mode: "hybrid"

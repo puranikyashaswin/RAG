@@ -1,0 +1,12 @@
+This is a placeholder for the trace screenshot PNG file.
+
+In a real implementation, this would be an actual screenshot image showing the LangSmith trace for a sample query, highlighting the graph nodes, tool calls, latencies, tokens, and costs.
+
+Example trace flow:
+- Plan Node: Decompose query into subgoals (latency: 0.5s, tokens: 150)
+- Retrieve Node: Hybrid search (latency: 1.2s, tool calls: retriever.search)
+- Synthesize Node: Generate answer with citations (latency: 2.0s, tokens: 300)
+- Verify Node: Check groundedness (latency: 0.8s, score: 0.85)
+- Decide Node: Finalize (no HITL needed)
+
+Total cost: $0.02, total latency: 4.5s

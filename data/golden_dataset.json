@@ -1,0 +1,38 @@
+<file_path>
+RAG/data/golden_dataset.json
+</file_path>
+
+<edit_description>
+Create a sample golden dataset for evaluation with questions, reference answers, and relevant documents.
+</edit_description>
+[
+  {
+    "question": "What are the key principles of AI ethics?",
+    "reference_answer": "The key principles of AI ethics include fairness, accountability, transparency, privacy, and safety. These ensure that AI systems are developed and deployed responsibly.",
+    "relevant_docs": [
+      "AI ethics principles emphasize fairness to avoid bias in decision-making processes.",
+      "Accountability requires developers to be answerable for AI outcomes.",
+      "Transparency means making AI decisions understandable to humans.",
+      "Privacy protects user data in AI applications.",
+      "Safety ensures AI systems do not cause harm."
+    ]
+  },
+  {
+    "question": "How does retrieval-augmented generation improve AI responses?",
+    "reference_answer": "Retrieval-augmented generation (RAG) improves AI responses by combining large language models with external knowledge sources, reducing hallucinations and providing more accurate, grounded answers.",
+    "relevant_docs": [
+      "RAG integrates retrieval mechanisms to fetch relevant information from databases.",
+      "It reduces the likelihood of generating false information by grounding responses in real data.",
+      "RAG enhances accuracy by augmenting LLM capabilities with up-to-date knowledge."
+    ]
+  },
+  {
+    "question": "What are the benefits of human-in-the-loop in AI systems?",
+    "reference_answer": "Human-in-the-loop (HITL) in AI systems provides oversight, improves reliability, allows for corrections, and ensures ethical decision-making by incorporating human judgment in critical paths.",
+    "relevant_docs": [
+      "HITL enables human intervention in AI decision-making processes.",
+      "It enhances system reliability by allowing experts to review and approve outputs.",
+      "HITL helps in maintaining ethical standards and correcting biases."
+    ]
+  }
+]

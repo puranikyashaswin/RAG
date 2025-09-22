@@ -1,0 +1,6 @@
+embed_model: "all-MiniLM-L6-v2"
+vector_db: "qdrant"
+collection_name: "healthcare_corpus"
+chunk_size: 1000
+overlap: 200
+domain_name: "Healthcare Guidelines"

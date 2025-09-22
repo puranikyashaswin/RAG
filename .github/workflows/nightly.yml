@@ -1,0 +1,51 @@
+name: Nightly Evaluation
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Daily at 2 AM UTC
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  nightly-eval:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Start Qdrant
+      run: |
+        docker run -d --name qdrant -p 6333:6333 qdrant/qdrant
+        sleep 10
+
+    - name: Ingest data
+      run: python src/ingestion.py
+
+    - name: Run full evaluation
+      run: |
+        TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+        python -m src.evaluation --dataset data/golden/healthcare.jsonl --output docs/reports/$TIMESTAMP --config_id nightly
+        cp -r docs/reports/$TIMESTAMP/* docs/reports/latest/
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: nightly-eval-results
+        path: docs/reports/latest/
+
+    - name: Commit latest results
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add docs/reports/latest/
+        git commit -m "Update nightly eval results" || echo "No changes to commit"
+        git push
