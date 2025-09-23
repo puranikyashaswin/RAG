@@ -19,4 +19,5 @@ pandas>=2.2.0
 scikit-learn>=1.5.0
 rank-bm25>=0.2.2
 langsmith>=0.1.0
+tenacity>=8.0.0
 datasets>=2.18.0

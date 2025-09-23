@@ -1,4 +1,5 @@
 import os
+import pickle
 from typing import List, Dict, Any
 import yaml
 from qdrant_client import QdrantClient
@@ -31,16 +32,31 @@ reranker = CrossEncoder(RERANK_MODEL)
 # Global BM25 index (to be built from corpus)
 bm25_index = None
 corpus_texts = []
+chunk_ids = []
+INDEX_FILE = "data/bm25_index.pkl"
 
-def build_bm25_index():
+def build_bm25_index(force_rebuild=False):
     """Build BM25 index from all documents in collection."""
-    global bm25_index, corpus_texts
-    if bm25_index is None:
-        # Fetch all points (in production, cache or precompute)
-        points = client.scroll(collection_name=COLLECTION_NAME, limit=10000)[0]
-        corpus_texts = [point.payload['text'] for point in points]
-        tokenized_corpus = [text.split() for text in corpus_texts]
-        bm25_index = BM25Okapi(tokenized_corpus)
+    global bm25_index, corpus_texts, chunk_ids
+    if bm25_index is None or force_rebuild:
+        if os.path.exists(INDEX_FILE) and not force_rebuild:
+            with open(INDEX_FILE, 'rb') as f:
+                data = pickle.load(f)
+                bm25_index = data['bm25_index']
+                corpus_texts = data['corpus_texts']
+                chunk_ids = data['chunk_ids']
+        else:
+            # Fetch all points (in production, cache or precompute)
+            points = client.scroll(collection_name=COLLECTION_NAME, limit=10000)[0]
+            corpus_texts = [point.payload['text'] for point in points]
+            chunk_ids = [point.id for point in points]
+            tokenized_corpus = [text.split() for text in corpus_texts]
+            bm25_index = BM25Okapi(tokenized_corpus)
+            # Save to file
+            data = {'bm25_index': bm25_index, 'corpus_texts': corpus_texts, 'chunk_ids': chunk_ids}
+            os.makedirs(os.path.dirname(INDEX_FILE), exist_ok=True)
+            with open(INDEX_FILE, 'wb') as f:
+                pickle.dump(data, f)
 
 def embed_query(query: str) -> List[float]:
     """Embed the query."""
@@ -87,11 +103,10 @@ def retrieve_sparse(query: str, top_k: int = 10, filters: Dict[str, Any] = None)
 
     results = []
     for idx in top_indices:
-        # Fetch point by id or simulate
-        # For simplicity, assume we have corpus_texts
-        point = client.retrieve(collection_name=COLLECTION_NAME, ids=[f"chunk_{idx}"])[0]  # Placeholder
+        chunk_id = chunk_ids[idx]
+        point = client.retrieve(collection_name=COLLECTION_NAME, ids=[chunk_id])[0]
         results.append({
-            "chunk_id": f"chunk_{idx}",
+            "chunk_id": chunk_id,
             "text": corpus_texts[idx],
             "score": bm25_scores[idx],
             "source_path": point.payload.get("source_path"),

@@ -1,9 +1,11 @@
+import json
 import os
 import uuid
 import time
 from typing import Dict, List, Any, TypedDict, Optional
 from datetime import datetime
 import yaml
+from tenacity import retry, stop_after_attempt, wait_exponential
 from langgraph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import interrupt
@@ -13,7 +15,16 @@ from langchain_core.output_parsers import StrOutputParser
 from langsmith import Client as LangSmithClient
 from dotenv import load_dotenv
 from retrieval import search as retriever_search
-from evaluation import groundedness_score  # Assuming implemented
+from ragas import evaluate
+from ragas.metrics import Groundedness
+from ragas.llms import LangchainLLM
+from datasets import Dataset
+
+def retried_invoke(chain, inputs):
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+    def _invoke():
+        return chain.invoke(inputs)
+    return _invoke()
 
 load_dotenv()
 
@@ -53,12 +64,16 @@ def plan_node(state: AgentState) -> AgentState:
     )
     prompt = ChatPromptTemplate.from_template(
         "Decompose the query into subgoals: {query}\n"
-        "Output a list of subgoals and a retrieval plan with query rewrites and filters."
+        "Output a JSON array of strings, each being a subgoal."
     )
     chain = prompt | llm | StrOutputParser()
-    plan_text = chain.invoke({"query": state["query"]})
-    # Parse subgoals (simple split)
-    subgoals = [g.strip() for g in plan_text.split('\n') if g.strip()]
+    plan_text = retried_invoke(chain, {"query": state["query"]})
+    # Parse subgoals from JSON
+    try:
+        subgoals = json.loads(plan_text)
+    except json.JSONDecodeError:
+        # Fallback to simple split
+        subgoals = [g.strip() for g in plan_text.split('\n') if g.strip()]
     new_state = {**state, "subgoals": subgoals, "attempts": 0}
     langsmith_client.update_run(trace_id, outputs={"subgoals": subgoals})
     return new_state
@@ -92,7 +107,7 @@ def synthesize_node(state: AgentState) -> AgentState:
         "Include citations in format [source_path:page|section|chunk_id]."
     )
     chain = prompt | llm | StrOutputParser()
-    draft = chain.invoke({"query": state["query"], "evidence": evidence_text})
+    draft = retried_invoke(chain, {"query": state["query"], "evidence": evidence_text})
     # Extract citations (placeholder)
     citations = [{"chunk_id": e['chunk_id'], "source": e['source_path']} for e in state['retrieved_evidence']]
     new_state = {**state, "draft_answer": draft, "citations": citations}
@@ -105,10 +120,15 @@ def verify_node(state: AgentState) -> AgentState:
     langsmith_client.create_run(
         name="verify", run_type="tool", inputs={"draft": state['draft_answer']}, trace_id=trace_id
     )
-    evidence_texts = [e['text'] for e in state['retrieved_evidence']]
-    groundedness = groundedness_score(state['draft_answer'], evidence_texts)
-    # Placeholder for other scores
-    scores = {"groundedness": groundedness['groundedness'], "faithfulness": 0.9, "relevance": 0.85}
+    data = {
+        "question": [state["query"]],
+        "answer": [state["draft_answer"]],
+        "contexts": [[e['text'] for e in state['retrieved_evidence']]],
+        "ground_truth": ["dummy"]
+    }
+    dataset = Dataset.from_dict(data)
+    ragas_scores = evaluate(dataset, metrics=[Groundedness()], llm=LangchainLLM(llm))
+    scores = {"groundedness": ragas_scores["groundedness"], "faithfulness": 0.9, "relevance": 0.85}
     new_state = {**state, "scores": scores}
     langsmith_client.update_run(trace_id, outputs=scores)
     return new_state

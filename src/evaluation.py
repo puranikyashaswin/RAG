@@ -5,7 +5,9 @@ from typing import List, Dict, Any
 import pandas as pd
 from sklearn.metrics import ndcg_score
 from ragas import evaluate
-from ragas.metrics import faithfulness, answer_relevancy, context_relevancy
+from ragas.metrics import Faithfulness, AnswerRelevancy, ContextPrecision, Groundedness
+from ragas.llms import LangchainLLM
+from langchain_openai import ChatOpenAI
 
 from datasets import Dataset
 from retrieval import search as retriever_search
@@ -15,6 +17,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Set up LLM for ragas metrics
+llm = ChatOpenAI(model="gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
+
 # Config will be loaded in run_evaluation
 
 def load_golden_dataset(path: str) -> List[Dict[str, Any]]:
@@ -22,22 +27,11 @@ def load_golden_dataset(path: str) -> List[Dict[str, Any]]:
     with open(path, 'r') as f:
         return [json.loads(line) for line in f]
 
-def groundedness_score(answer: str, evidence: List[str]) -> Dict[str, Any]:
-    """Compute groundedness score."""
-    # Placeholder: use Ragas or custom
-    data = {
-        "question": ["dummy"],
-        "answer": [answer],
-        "contexts": [evidence],
-        "ground_truth": ["dummy"]
-    }
-    dataset = Dataset.from_dict(data)
-    scores = evaluate(dataset, metrics=[context_relevancy])  # Approximation
-    return {"groundedness": scores["context_relevancy"], "verdict": "ok", "missing_claims": []}
+# Removed custom groundedness_score; using ragas groundedness metric directly
 
-def evaluate_retrieval(query: str, relevant_docs: List[str], top_k: int = 10) -> Dict[str, float]:
+def evaluate_retrieval(query: str, relevant_docs: List[str], top_k: int = 10, mode: str = "hybrid") -> Dict[str, float]:
     """Evaluate retrieval metrics."""
-    retrieved = retriever_search(query, top_k=top_k)
+    retrieved = retriever_search(query, top_k=top_k, mode=mode)
     retrieved_texts = [doc["text"] for doc in retrieved]
     retrieved_ids = [doc["chunk_id"] for doc in retrieved]
 
@@ -56,11 +50,30 @@ def evaluate_retrieval(query: str, relevant_docs: List[str], top_k: int = 10) ->
             metrics[f"ndcg@{k}"] = ndcg
     return metrics
 
-def evaluate_generation(query: str, reference_answer: str, retrieved_docs: List[Dict[str, Any]]) -> Dict[str, float]:
+def evaluate_generation(query: str, reference_answer: str, retrieved_docs: List[Dict[str, Any]], mode: str = "hybrid") -> Dict[str, float]:
     """Evaluate generation metrics."""
-    result = run_agent(query)
-    answer = result["draft_answer"]
+    try:
+        result = run_agent(query)
+        answer = result["draft_answer"]
+    except Exception as e:
+        print(f"Agent failed for query '{query}': {e}")
+        return {
+            "faithfulness": 0.0,
+            "answer_relevancy": 0.0,
+            "context_relevancy": 0.0,
+            "groundedness": 0.0,
+            "completeness": 0.0
+        }
     contexts = [doc["text"] for doc in retrieved_docs]
+
+    if not contexts:
+        return {
+            "faithfulness": 0.0,
+            "answer_relevancy": 0.0,
+            "context_relevancy": 0.0,
+            "groundedness": 0.0,
+            "completeness": 0.0
+        }
 
     data = {
         "question": [query],
@@ -69,17 +82,16 @@ def evaluate_generation(query: str, reference_answer: str, retrieved_docs: List[
         "ground_truth": [reference_answer]
     }
     dataset = Dataset.from_dict(data)
-    scores = evaluate(dataset, metrics=[faithfulness, answer_relevancy, context_relevancy])
-    groundedness = groundedness_score(answer, contexts)["groundedness"]
+    scores = evaluate(dataset, metrics=[Faithfulness(), AnswerRelevancy(), ContextPrecision(), Groundedness()], llm=LangchainLLM(llm))
     return {
         "faithfulness": scores["faithfulness"],
         "answer_relevancy": scores["answer_relevancy"],
-        "context_relevancy": scores["context_relevancy"],
-        "groundedness": groundedness,
+        "context_relevancy": scores["context_precision"],
+        "groundedness": scores["groundedness"],
         "completeness": 0.8  # Placeholder
     }
 
-def run_evaluation(dataset_path: str, output_dir: str, config_id: str, config_path: str):
+def run_evaluation(dataset_path: str, output_dir: str, config_id: str, config_path: str, mode: str):
     """Run full evaluation and generate reports."""
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
@@ -97,11 +109,11 @@ def run_evaluation(dataset_path: str, output_dir: str, config_id: str, config_pa
         relevant_docs = item.get("references", [])
 
         # Retrieval metrics
-        ret_metrics = evaluate_retrieval(query, relevant_docs, top_k=max(K_LIST))
+        ret_metrics = evaluate_retrieval(query, relevant_docs, top_k=max(K_LIST), mode=mode)
 
         # Generation metrics
-        retrieved = retriever_search(query, top_k=10)
-        gen_metrics = evaluate_generation(query, reference, retrieved)
+        retrieved = retriever_search(query, top_k=10, mode=mode)
+        gen_metrics = evaluate_generation(query, reference, retrieved, mode=mode)
 
         result = {
             "id": item["id"],
@@ -172,5 +184,6 @@ if __name__ == "__main__":
     parser.add_argument("--output", default="docs/reports", help="Output directory")
     parser.add_argument("--config", default="config/eval_config.yaml", help="Path to config file")
     parser.add_argument("--config_id", default="default", help="Config ID")
+    parser.add_argument("--mode", default="hybrid", help="Retrieval mode: dense, sparse, hybrid")
     args = parser.parse_args()
-    run_evaluation(args.dataset, args.output, args.config_id, args.config)
+    run_evaluation(args.dataset, args.output, args.config_id, args.config, args.mode)

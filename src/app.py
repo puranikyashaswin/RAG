@@ -1,5 +1,7 @@
 import os
 import uuid
+import logging
+import traceback
 from typing import Dict, Any, Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -11,8 +13,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Load config
-with open("config/app_config.yaml", 'r') as f:
-    config = yaml.safe_load(f)
+try:
+    with open("config/app_config.yaml", 'r') as f:
+        config = yaml.safe_load(f)
+except FileNotFoundError:
+    raise RuntimeError("Configuration file config/app_config.yaml not found.")
+except yaml.YAMLError as e:
+    raise RuntimeError(f"Error parsing config file: {e}")
 
 app = FastAPI(title="Agentic RAG Research Assistant")
 
@@ -57,6 +64,7 @@ async def query_assistant(request: QueryRequest):
             trace_id=result["trace_id"]
         )
     except Exception as e:
+        logging.error(f"Error in /query for query '{request.query}': {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/hitl/approve")
@@ -73,6 +81,7 @@ async def hitl_approve(request: HITLApproveRequest):
             pass
         return {"status": "resumed"}
     except Exception as e:
+        logging.error(f"Error in /hitl/approve for trace_id '{request.trace_id}': {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/eval/run", response_model=EvalRunResponse)
@@ -86,6 +95,7 @@ async def run_eval(request: EvalRunRequest):
             aggregates = {"avg_groundedness": 0.8}  # Placeholder
         return EvalRunResponse(report_path=output_dir, aggregates=aggregates)
     except Exception as e:
+        logging.error(f"Error in /eval/run for dataset '{request.dataset_path}': {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
