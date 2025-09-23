@@ -1,7 +1,7 @@
 import json
 import os
 import argparse
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import pandas as pd
 from sklearn.metrics import ndcg_score
 from ragas import evaluate
@@ -29,7 +29,7 @@ def load_golden_dataset(path: str) -> List[Dict[str, Any]]:
 
 # Groundedness is handled by ragas Groundedness metric
 
-def evaluate_retrieval(query: str, relevant_docs: List[str], top_k: int = 10, mode: str = "hybrid", k_list: List[int] = None) -> Dict[str, float]:
+def evaluate_retrieval(query: str, relevant_docs: List[str], top_k: int = 10, mode: str = "hybrid", k_list: Optional[List[int]] = None) -> Dict[str, float]:
     """Evaluate retrieval metrics."""
     if k_list is None:
         k_list = [1, 3, 5, 10]
@@ -86,10 +86,10 @@ def evaluate_generation(query: str, reference_answer: str, retrieved_docs: List[
     dataset = Dataset.from_dict(data)
     scores = evaluate(dataset, metrics=[Faithfulness(), AnswerRelevancy(), ContextPrecision(), Groundedness()], llm=LangchainLLM(llm))
     return {
-        "faithfulness": scores["faithfulness"],
-        "answer_relevancy": scores["answer_relevancy"],
-        "context_relevancy": scores["context_precision"],
-        "groundedness": scores["groundedness"],
+        "faithfulness": scores["faithfulness"][0],
+        "answer_relevancy": scores["answer_relevancy"][0],
+        "context_relevancy": scores["context_precision"][0],
+        "groundedness": scores["groundedness"][0],
         "completeness": 0.8  # Placeholder
     }
 
