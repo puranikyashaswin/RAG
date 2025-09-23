@@ -5,7 +5,8 @@ from typing import List, Dict, Any
 import pandas as pd
 from sklearn.metrics import ndcg_score
 from ragas import evaluate
-from ragas.metrics import faithfulness, answer_relevancy, context_relevancy
+from ragas.metrics import faithfulness, answer_relevancy
+from ragas.metrics.context_precision import context_relevancy # Corrected import
 from datasets import Dataset
 from retrieval import search as retriever_search
 from agent import run_agent
