@@ -5,8 +5,8 @@ from typing import List, Dict, Any
 import pandas as pd
 from sklearn.metrics import ndcg_score
 from ragas import evaluate
-from ragas.metrics import faithfulness, answer_relevancy
-from ragas.metrics.context_precision import context_relevancy # Corrected import
+from ragas.metrics import faithfulness, answer_relevancy, context_precision
+
 from datasets import Dataset
 from retrieval import search as retriever_search
 from agent import run_agent
@@ -37,8 +37,8 @@ def groundedness_score(answer: str, evidence: List[str]) -> Dict[str, Any]:
         "ground_truth": ["dummy"]
     }
     dataset = Dataset.from_dict(data)
-    scores = evaluate(dataset, metrics=[context_relevancy])  # Approximation
-    return {"groundedness": scores["context_relevancy"], "verdict": "ok", "missing_claims": []}
+    scores = evaluate(dataset, metrics=[context_precision])  # Approximation
+    return {"groundedness": scores["context_precision"], "verdict": "ok", "missing_claims": []}
 
 def evaluate_retrieval(query: str, relevant_docs: List[str], top_k: int = 10) -> Dict[str, float]:
     """Evaluate retrieval metrics."""
@@ -74,12 +74,12 @@ def evaluate_generation(query: str, reference_answer: str, retrieved_docs: List[
         "ground_truth": [reference_answer]
     }
     dataset = Dataset.from_dict(data)
-    scores = evaluate(dataset, metrics=[faithfulness, answer_relevancy, context_relevancy])
+    scores = evaluate(dataset, metrics=[faithfulness, answer_relevancy, context_precision])
     groundedness = groundedness_score(answer, contexts)["groundedness"]
     return {
         "faithfulness": scores["faithfulness"],
         "answer_relevancy": scores["answer_relevancy"],
-        "context_relevancy": scores["context_relevancy"],
+        "context_relevancy": scores["context_precision"],
         "groundedness": groundedness,
         "completeness": 0.8  # Placeholder
     }
