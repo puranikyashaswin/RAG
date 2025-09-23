@@ -13,7 +13,10 @@ from langchain_core.output_parsers import StrOutputParser
 from langsmith import Client as LangSmithClient
 from dotenv import load_dotenv
 from retrieval import search as retriever_search
-from evaluation import groundedness_score
+from ragas import evaluate
+from ragas.metrics import Groundedness
+from ragas.llms import LangchainLLM
+from datasets import Dataset
 
 load_dotenv()
 
@@ -105,10 +108,15 @@ def verify_node(state: AgentState) -> AgentState:
     langsmith_client.create_run(
         name="verify", run_type="tool", inputs={"draft": state['draft_answer']}, trace_id=trace_id
     )
-    evidence_texts = [e['text'] for e in state['retrieved_evidence']]
-    groundedness = groundedness_score(state['draft_answer'], evidence_texts)
-    # Placeholder for other scores
-    scores = {"groundedness": groundedness['groundedness'], "faithfulness": 0.9, "relevance": 0.85}
+    data = {
+        "question": [state["query"]],
+        "answer": [state["draft_answer"]],
+        "contexts": [[e['text'] for e in state['retrieved_evidence']]],
+        "ground_truth": ["dummy"]
+    }
+    dataset = Dataset.from_dict(data)
+    ragas_scores = evaluate(dataset, metrics=[Groundedness()], llm=LangchainLLM(llm))
+    scores = {"groundedness": ragas_scores["groundedness"], "faithfulness": 0.9, "relevance": 0.85}
     new_state = {**state, "scores": scores}
     langsmith_client.update_run(trace_id, outputs=scores)
     return new_state

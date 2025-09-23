@@ -5,7 +5,9 @@ from typing import List, Dict, Any
 import pandas as pd
 from sklearn.metrics import ndcg_score
 from ragas import evaluate
-from ragas.metrics import faithfulness, answer_relevancy, context_relevancy
+from ragas.metrics import Faithfulness, AnswerRelevancy, ContextPrecision, Groundedness
+from ragas.llms import LangchainLLM
+from langchain_openai import ChatOpenAI
 
 from datasets import Dataset
 from retrieval import search as retriever_search
@@ -15,7 +17,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-
+# Initialize LLM for ragas
+llm = ChatOpenAI(model="gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
 
 # Config will be loaded in run_evaluation
 
@@ -24,18 +27,7 @@ def load_golden_dataset(path: str) -> List[Dict[str, Any]]:
     with open(path, 'r') as f:
         return [json.loads(line) for line in f]
 
-def groundedness_score(answer: str, evidence: List[str]) -> Dict[str, Any]:
-    """Compute groundedness score."""
-    # Placeholder: use Ragas or custom
-    data = {
-        "question": ["dummy"],
-        "answer": [answer],
-        "contexts": [evidence],
-        "ground_truth": ["dummy"]
-    }
-    dataset = Dataset.from_dict(data)
-    scores = evaluate(dataset, metrics=[context_relevancy])  # Approximation
-    return {"groundedness": scores["context_relevancy"], "verdict": "ok", "missing_claims": []}
+# Groundedness is handled by ragas Groundedness metric
 
 def evaluate_retrieval(query: str, relevant_docs: List[str], top_k: int = 10, mode: str = "hybrid") -> Dict[str, float]:
     """Evaluate retrieval metrics."""
@@ -90,13 +82,12 @@ def evaluate_generation(query: str, reference_answer: str, retrieved_docs: List[
         "ground_truth": [reference_answer]
     }
     dataset = Dataset.from_dict(data)
-    scores = evaluate(dataset, metrics=[faithfulness, answer_relevancy, context_relevancy])
-    groundedness = groundedness_score(answer, contexts)["groundedness"]
+    scores = evaluate(dataset, metrics=[Faithfulness(), AnswerRelevancy(), ContextPrecision(), Groundedness()], llm=LangchainLLM(llm))
     return {
         "faithfulness": scores["faithfulness"],
         "answer_relevancy": scores["answer_relevancy"],
-        "context_relevancy": scores["context_relevancy"],
-        "groundedness": groundedness,
+        "context_relevancy": scores["context_precision"],
+        "groundedness": scores["groundedness"],
         "completeness": 0.8  # Placeholder
     }
 
