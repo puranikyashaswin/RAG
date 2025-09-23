@@ -1,10 +1,3 @@
-<file_path>
-RAG/src/app.py
-</file_path>
-
-<edit_description>
-Add a health check endpoint to the app.
-</edit_description>
 import os
 import uuid
 from typing import Dict, Any, Optional

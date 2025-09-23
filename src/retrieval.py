@@ -1,10 +1,3 @@
-<file_path>
-RAG/src/retrieval.py
-</file_path>
-
-<edit_description>
-Update retrieval.py with hybrid search (dense + sparse BM25), score fusion, and reranking.
-</edit_description>
 import os
 from typing import List, Dict, Any
 import yaml

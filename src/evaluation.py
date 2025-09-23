@@ -5,7 +5,7 @@ from typing import List, Dict, Any
 import pandas as pd
 from sklearn.metrics import ndcg_score
 from ragas import evaluate
-from ragas.metrics import faithfulness, answer_relevancy, context_precision
+from ragas.metrics import faithfulness, answer_relevancy, context_relevancy
 
 from datasets import Dataset
 from retrieval import search as retriever_search
@@ -15,12 +15,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Load config
-with open("config/eval_config.yaml", 'r') as f:
-    config = yaml.safe_load(f)
-
-K_LIST = config.get('k_list', [1, 3, 5, 10])
-REGRESSION_TOLERANCE = config.get('regression_tolerance', 0.05)
+# Config will be loaded in run_evaluation
 
 def load_golden_dataset(path: str) -> List[Dict[str, Any]]:
     """Load the golden dataset from JSONL."""
@@ -37,8 +32,8 @@ def groundedness_score(answer: str, evidence: List[str]) -> Dict[str, Any]:
         "ground_truth": ["dummy"]
     }
     dataset = Dataset.from_dict(data)
-    scores = evaluate(dataset, metrics=[context_precision])  # Approximation
-    return {"groundedness": scores["context_precision"], "verdict": "ok", "missing_claims": []}
+    scores = evaluate(dataset, metrics=[context_relevancy])  # Approximation
+    return {"groundedness": scores["context_relevancy"], "verdict": "ok", "missing_claims": []}
 
 def evaluate_retrieval(query: str, relevant_docs: List[str], top_k: int = 10) -> Dict[str, float]:
     """Evaluate retrieval metrics."""
@@ -74,18 +69,24 @@ def evaluate_generation(query: str, reference_answer: str, retrieved_docs: List[
         "ground_truth": [reference_answer]
     }
     dataset = Dataset.from_dict(data)
-    scores = evaluate(dataset, metrics=[faithfulness, answer_relevancy, context_precision])
+    scores = evaluate(dataset, metrics=[faithfulness, answer_relevancy, context_relevancy])
     groundedness = groundedness_score(answer, contexts)["groundedness"]
     return {
         "faithfulness": scores["faithfulness"],
         "answer_relevancy": scores["answer_relevancy"],
-        "context_relevancy": scores["context_precision"],
+        "context_relevancy": scores["context_relevancy"],
         "groundedness": groundedness,
         "completeness": 0.8  # Placeholder
     }
 
-def run_evaluation(dataset_path: str, output_dir: str, config_id: str):
+def run_evaluation(dataset_path: str, output_dir: str, config_id: str, config_path: str):
     """Run full evaluation and generate reports."""
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+
+    K_LIST = config.get('k_list', [1, 3, 5, 10])
+    REGRESSION_TOLERANCE = config.get('regression_tolerance', 0.05)
+
     golden_data = load_golden_dataset(dataset_path)
     results = []
     aggregates = {f"avg_{k}": [] for k in ["precision@5", "recall@5", "ndcg@10", "groundedness", "faithfulness", "answer_relevancy", "context_relevancy", "completeness"]}
@@ -169,6 +170,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run evaluation harness")
     parser.add_argument("--dataset", default="data/golden/healthcare.jsonl", help="Path to golden dataset")
     parser.add_argument("--output", default="docs/reports", help="Output directory")
+    parser.add_argument("--config", default="config/eval_config.yaml", help="Path to config file")
     parser.add_argument("--config_id", default="default", help="Config ID")
     args = parser.parse_args()
-    run_evaluation(args.dataset, args.output, args.config_id)
+    run_evaluation(args.dataset, args.output, args.config_id, args.config)
