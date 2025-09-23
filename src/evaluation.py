@@ -29,18 +29,20 @@ def load_golden_dataset(path: str) -> List[Dict[str, Any]]:
 
 # Groundedness is handled by ragas Groundedness metric
 
-def evaluate_retrieval(query: str, relevant_docs: List[str], top_k: int = 10, mode: str = "hybrid") -> Dict[str, float]:
+def evaluate_retrieval(query: str, relevant_docs: List[str], top_k: int = 10, mode: str = "hybrid", k_list: List[int] = None) -> Dict[str, float]:
     """Evaluate retrieval metrics."""
+    if k_list is None:
+        k_list = [1, 3, 5, 10]
+
     retrieved = retriever_search(query, top_k=top_k, mode=mode)
     retrieved_texts = [doc["text"] for doc in retrieved]
-    retrieved_ids = [doc["chunk_id"] for doc in retrieved]
 
     # Binary relevance (assume relevant if text contains any relevant phrase)
     y_true = [1 if any(rel in text for rel in relevant_docs) else 0 for text in retrieved_texts]
     y_score = [1] * len(retrieved_texts)  # Assume retrieved are scored high
 
     metrics = {}
-    for k in K_LIST:
+    for k in k_list:
         if k <= len(y_true):
             precision_k = sum(y_true[:k]) / k
             recall_k = sum(y_true[:k]) / len(relevant_docs) if relevant_docs else 0
@@ -109,7 +111,7 @@ def run_evaluation(dataset_path: str, output_dir: str, config_id: str, config_pa
         relevant_docs = item.get("references", [])
 
         # Retrieval metrics
-        ret_metrics = evaluate_retrieval(query, relevant_docs, top_k=max(K_LIST), mode=mode)
+        ret_metrics = evaluate_retrieval(query, relevant_docs, top_k=max(K_LIST), mode=mode, k_list=K_LIST)
 
         # Generation metrics
         retrieved = retriever_search(query, top_k=10, mode=mode)

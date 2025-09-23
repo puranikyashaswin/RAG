@@ -8,12 +8,12 @@ langchain-openai>=0.1.0
 PyPDF2>=3.0.1
 beautifulsoup4>=4.12.3
 Markdown>=3.6
-ragas==0.1.7
+ragas>=0.3.0
 fastapi>=0.111.0
 uvicorn>=0.30.0
 streamlit>=1.35.0
 python-dotenv>=1.0.0
-pydantic==1.10.13
+pydantic>=2.0.0
 numpy>=1.26.0
 pandas>=2.2.0
 scikit-learn>=1.5.0
