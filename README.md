@@ -6,27 +6,7 @@ A production-grade Agentic RAG Research Assistant for Healthcare Guidelines, fea
 
 Healthcare professionals need quick, accurate answers from complex guideline documents. This assistant plans queries, retrieves evidence from a private corpus, synthesizes grounded responses with citations, verifies quality, and escalates to human review when uncertain. It ensures reliability through rigorous evaluation and HITL for critical decisions.
 
-## Architecture Diagram
 
-```
-[Ingestion]
-Healthcare PDFs/HTML/Markdown → Semantic Chunking → Embeddings (text-embedding-3-small) → Qdrant DB
-
-[Retrieval]
-Query → Hybrid (Dense + BM25) → Score Fusion → Cross-Encoder Rerank → Top-K Chunks
-
-[Orchestration (LangGraph)]
-Plan → Retrieve → Synthesize → Verify → Decide {Finalize | Refine | Escalate to HITL}
-
-[HITL]
-Interrupt on Low Groundedness (<0.80) → Human Approval → Resume Deterministically
-
-[Evaluation]
-Golden Dataset → Metrics (Precision@K, Recall@K, NDCG, Groundedness, Faithfulness) → Reports
-
-[API & Observability]
-FastAPI Endpoints + LangSmith Tracing (Tokens, Latency, Costs, Replays)
-```
 
 ## Quickstart
 
