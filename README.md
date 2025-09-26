@@ -4,7 +4,7 @@ A production-grade Agentic RAG Research Assistant for Healthcare Guidelines, fea
 
 ## Problem Statement
 
-Healthcare professionals need quick, accurate answers from complex guideline documents. This assistant plans queries, retrieves evidence from a private corpus, synthesizes grounded responses with citations, verifies quality, and escalates to human review when uncertain. It ensures reliability through rigorous evaluation and HITL for critical decisions.
+Healthcare professionals need quick, accurate answers from complex guideline documents. This assistant plans queries, retrieves evidence from a private corpus, synthesizes grounded responses with citations, verifies quality, and escalates to human review when uncertain. It ensures reliability through rigorous evaluation and HITL for critical decisions..
 
 
 
